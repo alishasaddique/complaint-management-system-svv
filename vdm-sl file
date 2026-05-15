@@ -1,0 +1,106 @@
+types
+
+TicketID = nat1;
+
+UserID  = nat1;
+AgentID = nat1;
+AdminID = nat1;
+
+TicketStatus =
+   <Open> |
+   <Assigned> |
+   <InProgress> |
+   <Resolved> |
+   <Closed>;
+   
+Ticket ::
+   id              : TicketID
+   description     : seq of char
+   status          : TicketStatus
+   createdBy       : UserID
+   assignedAgent   : [AgentID]
+   resolutionNotes : [seq of char];
+
+state ComplaintSystem of
+   tickets : map TicketID to Ticket
+
+inv mk_ComplaintSystem(tickets) ==
+   -- Closed tickets must have been assigned
+   forall tid in set dom tickets &
+      let t = tickets(tid) in
+         (t.status = <Closed> => t.assignedAgent <> nil) and
+         ((t.status = <Resolved> or t.status = <Closed>) =>
+            t.resolutionNotes <> nil)
+
+init s ==
+   s = mk_ComplaintSystem({|->})
+
+end
+   
+functions
+
+NextTicketID: map TicketID to Ticket -> TicketID
+NextTicketID(tks) ==
+   if tks = {|->} then 1
+   else (iota m in set dom tks & forall n in set dom tks & n <= m) + 1;
+   
+operations
+
+CreateTicket: seq of char * UserID ==> ()
+CreateTicket(desc, uid) ==
+   let tid = NextTicketID(tickets) in
+      tickets := tickets munion
+         { tid |-> mk_Ticket(tid, desc, <Open>, uid, nil, nil) }
+pre
+   len desc > 0 and len desc <= 500;
+
+AssignTicket: TicketID * AgentID ==> ()
+AssignTicket(tid, aid) ==
+   tickets := tickets ++
+      { tid |-> mu(tickets(tid),
+                   status |-> <Assigned>,
+                   assignedAgent |-> aid) }
+pre
+   tid in set dom tickets and
+   tickets(tid).status = <Open>;
+
+StartProcessing: TicketID * AgentID ==> ()
+StartProcessing(tid, aid) ==
+   tickets := tickets ++
+      { tid |-> mu(tickets(tid),
+                   status |-> <InProgress>) }
+pre
+   tid in set dom tickets and
+   tickets(tid).status = <Assigned> and
+   tickets(tid).assignedAgent = aid;
+
+ResolveTicket: TicketID * seq of char ==> ()
+ResolveTicket(tid, notes) ==
+   tickets := tickets ++
+      { tid |-> mu(tickets(tid),
+                   status |-> <Resolved>,
+                   resolutionNotes |-> notes) }
+pre
+   tid in set dom tickets and
+   tickets(tid).status = <InProgress> and
+   len notes > 0;
+
+CloseTicket: TicketID ==> ()
+CloseTicket(tid) ==
+   tickets := tickets ++
+      { tid |-> mu(tickets(tid),
+                   status |-> <Closed>) }
+pre
+   tid in set dom tickets and
+   tickets(tid).status = <Resolved>;
+
+ReopenTicket: TicketID ==> ()
+ReopenTicket(tid) ==
+   tickets := tickets ++
+      { tid |-> mu(tickets(tid),
+                   status |-> <Open>,
+                   assignedAgent |-> nil,
+                   resolutionNotes |-> nil) }
+pre
+   tid in set dom tickets and
+   tickets(tid).status = <Closed>;
