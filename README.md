@@ -17,3 +17,16 @@ Complaint Management System (Ticket-Based Workflow)
 - alloy-model
 - validation
 - ci-pipeline
+
+
+# Alloy Model
+
+This folder contains the Alloy-based structural verification of the Complaint Management System.
+
+Contents:
+- Alloy relational model
+- Constraint verification
+- Assertion checking
+- Counterexample analysis
+- Alloy verification report
+
